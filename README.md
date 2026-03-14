@@ -83,7 +83,7 @@ ai-learning-companion
 
 
 1️⃣ Clone the repository
-git clone https://github.com/Diya-k-d/study-companion-ai.git
+git clone https://github.com/Diya-k-d/StudyCompanion.git
 cd study-companion-ai
 
 2️⃣ Create a virtual environment
