@@ -257,6 +257,17 @@ llama.cpp
 
 Ollama
 
+## 📸 Demo
+
+### Application Interface
+
+![StudyCompanion App](App.png)
+
+### Chat Example
+
+![StudyCompanion Chat](App2.png)
+
+
 
 📚 Learning Outcomes
 
