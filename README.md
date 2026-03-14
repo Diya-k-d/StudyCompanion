@@ -116,6 +116,66 @@ Summarize this chapter.
 The system retrieves relevant text from the document and generates an explanation.
 
 
+🧪 Retrieval-Augmented Generation (RAG)
+
+This project implements a Retrieval-Augmented Generation pipeline, which is commonly used in modern AI systems for document-based question answering.
+
+Instead of sending the entire document to the language model, the system retrieves only the most relevant information.
+
+Steps in the RAG pipeline
+
+Document Processing
+
+Uploaded PDFs are converted into text.
+
+Text Chunking
+
+The text is divided into smaller segments (chunks) to improve retrieval accuracy.
+
+Embedding Generation
+
+Each chunk is converted into vector embeddings using Sentence Transformers.
+
+Vector Storage
+
+The embeddings are stored in a FAISS vector database.
+
+Semantic Search
+
+When a user asks a question, the system converts the question into an embedding and retrieves the most similar chunks.
+
+Context Injection
+
+The retrieved context is combined with the user question.
+
+Language Model Response
+
+The Phi-3 language model generates an answer based on the retrieved context.
+
+This architecture improves accuracy by grounding responses in the original document rather than relying solely on the model’s training data.
+
+
+⚙️ Key Engineering Decisions
+Why RAG instead of fine-tuning?
+
+Fine-tuning a model requires large datasets and high computational resources.
+Using RAG allows the system to work with new documents instantly without retraining the model.
+
+Why FAISS?
+
+FAISS provides efficient similarity search for large embedding datasets and enables fast retrieval of relevant document chunks.
+
+Why Phi-3 Mini?
+
+Phi-3 Mini was chosen because:
+
+It is open-source
+
+It can run locally
+
+It does not require paid APIs
+
+However, larger models such as GPT-4 or Claude could significantly improve answer quality.
 
 ⚠️ Challenges Faced During Development
 
