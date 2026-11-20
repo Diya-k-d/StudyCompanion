@@ -1,8 +1,4 @@
---extra-index-url https://download.pytorch.org/whl/cpu
 streamlit
-torch==2.3.1+cpu
-sentence-transformers==3.0.1
-transformers==4.41.2
-faiss-cpu
-pypdf
+onnxruntime
 numpy
+pypdf

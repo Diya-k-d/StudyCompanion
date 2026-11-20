@@ -1,14 +1,10 @@
 import streamlit as st
-import sys
-import os
 import uuid
 import time
 
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-from src.pdf_reader import read_pdf
-from src.vector_store import create_vector_store
-from src.qa_system import answer_question, load_llm
+from pdf_reader import read_pdf
+from vector_store import create_vector_store
+from qa_system import answer_question, load_llm
 
 
 # ------------------------------------------------
@@ -149,7 +145,7 @@ st.markdown("---")
 def initialize_llm():
     return load_llm()
 
-tokenizer, model = initialize_llm()
+initialize_llm()
 
 
 # ------------------------------------------------

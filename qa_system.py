@@ -1,37 +1,47 @@
-from transformers import AutoTokenizer, AutoModelForCausalLM
-import torch
-from src.vector_store import search_vector_store
+import os
+import json
+import urllib.request
+
+from vector_store import search_vector_store
 
 
 # ------------------------------------------------
 # Model config
 # ------------------------------------------------
-model_name = "microsoft/phi-3-mini-4k-instruct"
-
-device = "mps" if torch.backends.mps.is_available() else "cpu"
-
-tokenizer = None
-model = None
+# Hosted demo build: answers come from the Gemini API free tier
+# (key lives in Streamlit secrets). The fully local Phi-3 Mini
+# version is at github.com/Diya-k-d/StudyCompanion.
+model_name = os.environ.get("SC_GEMINI_MODEL", "gemini-2.5-flash")
 
 
 # ------------------------------------------------
-# Load model once
+# API key
+# ------------------------------------------------
+def get_api_key():
+
+    # Streamlit Cloud secrets first, then environment
+    try:
+        import streamlit as st
+        key = st.secrets.get("GEMINI_API_KEY", "")
+        if key:
+            return key
+    except Exception:
+        pass
+
+    return os.environ.get("GEMINI_API_KEY", "")
+
+
+# ------------------------------------------------
+# Startup check (called once by app.py)
 # ------------------------------------------------
 def load_llm():
 
-    global tokenizer, model
+    if not get_api_key():
+        raise RuntimeError(
+            "GEMINI_API_KEY is not set. Add it in the app's Streamlit secrets."
+        )
 
-    if tokenizer is None or model is None:
-
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-
-        model = AutoModelForCausalLM.from_pretrained(
-            model_name,
-            torch_dtype=torch.float16,
-            low_cpu_mem_usage=True
-        ).to(device)
-
-    return tokenizer, model
+    return True
 
 
 # ------------------------------------------------
@@ -46,7 +56,7 @@ def clean_answer(text):
     sentences = text.split(".")
     text = ".".join(sentences[:3]).strip()
 
-    if not text.endswith("."):
+    if text and not text.endswith("."):
         text += "."
 
     return text
@@ -57,8 +67,6 @@ def clean_answer(text):
 # ------------------------------------------------
 def answer_question(index, chunks, question):
 
-    tokenizer, model = load_llm()
-
     # Retrieve most relevant chunk
     context = search_vector_store(index, chunks, question)
 
@@ -66,52 +74,52 @@ def answer_question(index, chunks, question):
     context = context[:450]
 
 
-    prompt = f"""
-<|system|>
-You are helping a student understand their study notes.
+    prompt = f"""You are helping a student understand their study notes.
 
 Instructions:
 - Read the context carefully.
 - Answer based mainly on the study notes.
 - Explain clearly in simple textbook language.
 - Do not invent unrelated information.
-- Write 1–3 sentences.
+- Write 1-3 sentences.
 
-<|user|>
 Study Notes:
 {context}
 
 Question:
 {question}
 
-Answer clearly using the study notes.
-
-<|assistant|>
-"""
+Answer clearly using the study notes."""
 
 
-    inputs = tokenizer(prompt, return_tensors="pt").to(device)
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        + model_name
+        + ":generateContent"
+    )
 
-    input_length = inputs["input_ids"].shape[1]
+    body = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "temperature": 0.2,
+            "topP": 0.9,
+            "maxOutputTokens": 150
+        }
+    }
 
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "x-goog-api-key": get_api_key()
+        }
+    )
 
-    with torch.no_grad():
+    with urllib.request.urlopen(request, timeout=60) as response:
+        data = json.loads(response.read().decode("utf-8"))
 
-        outputs = model.generate(
-            **inputs,
-            max_new_tokens=120,
-            do_sample=True,
-            temperature=0.2,
-            top_p=0.9,
-            repetition_penalty=1.1,
-            pad_token_id=tokenizer.eos_token_id
-        )
-
-
-    # decode only generated tokens
-    generated_tokens = outputs[0][input_length:]
-
-    answer = tokenizer.decode(generated_tokens, skip_special_tokens=True)
+    answer = data["candidates"][0]["content"]["parts"][0]["text"]
 
     answer = clean_answer(answer)
 
