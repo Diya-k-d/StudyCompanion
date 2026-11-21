@@ -85,28 +85,39 @@ def encode(text, vocab):
 
 
 def embed(texts):
+    if not texts:
+        return np.zeros((0, 384), dtype="float32")
     session, vocab = load_model()
-    all_ids, all_mask, all_types = [], [], []
-    for t in texts:
-        ids, mask, types = encode(t, vocab)
-        all_ids.append(ids)
-        all_mask.append(mask)
-        all_types.append(types)
 
-    outputs = session.run(
-        None,
-        {
-            "input_ids": np.array(all_ids, dtype=np.int64),
-            "attention_mask": np.array(all_mask, dtype=np.int64),
-            "token_type_ids": np.array(all_types, dtype=np.int64),
-        },
-    )
-    token_embeddings = outputs[0]  # (batch, seq, dim)
+    # small batches keep memory low on free hosts
+    results = []
+    batch_size = 32
+    for start in range(0, len(texts), batch_size):
+        batch = texts[start:start + batch_size]
 
-    mask = np.array(all_mask, dtype="float32")[:, :, None]
-    summed = (token_embeddings * mask).sum(axis=1)
-    counts = np.maximum(mask.sum(axis=1), 1e-12)
-    embeddings = summed / counts  # mean pooling
+        all_ids, all_mask, all_types = [], [], []
+        for t in batch:
+            ids, mask, types = encode(t, vocab)
+            all_ids.append(ids)
+            all_mask.append(mask)
+            all_types.append(types)
+
+        outputs = session.run(
+            None,
+            {
+                "input_ids": np.array(all_ids, dtype=np.int64),
+                "attention_mask": np.array(all_mask, dtype=np.int64),
+                "token_type_ids": np.array(all_types, dtype=np.int64),
+            },
+        )
+        token_embeddings = outputs[0]  # (batch, seq, dim)
+
+        mask = np.array(all_mask, dtype="float32")[:, :, None]
+        summed = (token_embeddings * mask).sum(axis=1)
+        counts = np.maximum(mask.sum(axis=1), 1e-12)
+        results.append(summed / counts)  # mean pooling
+
+    embeddings = np.vstack(results)
 
     norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
     return (embeddings / np.maximum(norms, 1e-12)).astype("float32")
@@ -134,6 +145,15 @@ def create_vector_store(text):
 
     if chunk:
         chunks.append(chunk.strip())
+
+    # drop empty chunks (blank or image-only PDFs)
+    chunks = [c for c in chunks if c]
+
+    # cap for free-host memory; plenty for study notes
+    chunks = chunks[:400]
+
+    if not chunks:
+        return None, []
 
     embeddings = embed(chunks)
 
