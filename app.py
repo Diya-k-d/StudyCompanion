@@ -182,7 +182,7 @@ with col1:
 
 with col2:
     uploaded_file = st.file_uploader(
-        "",
+        "Upload your study notes (PDF)",
         type="pdf",
         label_visibility="collapsed",
         key=f"upload_{st.session_state.current_chat}"
@@ -194,12 +194,23 @@ with col2:
 # ------------------------------------------------
 if uploaded_file:
 
-    text = read_pdf(uploaded_file)
+    try:
 
-    index, chunks = create_vector_store(text)
+        text = read_pdf(uploaded_file)
 
-    chat["index"] = index
-    chat["chunks"] = chunks
+        index, chunks = create_vector_store(text)
+
+        chat["index"] = index
+        chat["chunks"] = chunks
+
+        if not chunks:
+            st.warning(
+                "Could not extract text from that PDF. "
+                "Scanned/image PDFs are not supported yet - try a text PDF."
+            )
+
+    except Exception as e:
+        st.error(f"Could not process that PDF: {e}")
 
 
 # ------------------------------------------------
@@ -222,12 +233,18 @@ if question:
         if chat["index"] is None:
             answer = "Please upload a PDF first."
 
+        elif not chat["chunks"]:
+            answer = "I could not read any text from that PDF. Try a text-based PDF."
+
         else:
-            answer = answer_question(
-                chat["index"],
-                chat["chunks"],
-                question
-            )
+            try:
+                answer = answer_question(
+                    chat["index"],
+                    chat["chunks"],
+                    question
+                )
+            except Exception as e:
+                answer = f"Something went wrong: {e}"
 
         streamed = ""
 
